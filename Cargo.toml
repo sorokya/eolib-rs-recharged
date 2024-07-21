@@ -1,8 +1,8 @@
 [package]
-name = "eolib"
-version = "1.0.0-RC8"
+name = "eolib-recharged"
+version = "1.0.0-RC1"
 authors = ["Richard Leek <richard@richardleek.com>"]
-description = "A core rust library for writing applications related to Endless Online"
+description = "A core rust library for writing applications related to Endless Online Recharged"
 edition = "2021"
 rust-version = "1.61.0"
 license = "MIT"
