@@ -30,8 +30,14 @@ impl Sequencer {
     /// returns the next sequence value
     pub fn next_sequence(&mut self) -> i32 {
         self.counter = (self.counter + 1) % 10;
-        let result = self.start + self.counter;
-        result
+
+        let result = if self.start + self.counter < 0 {
+            81 + self.start + self.counter
+        } else {
+            self.start + self.counter
+        };
+
+        result % 253
     }
 
     /// sets a new starting value for the sequencer
@@ -86,5 +92,5 @@ pub fn get_ping_sequence_bytes(start: i32) -> [i32; 2] {
 ///
 /// used by the client after receiving Ping packet
 pub fn get_ping_sequence_start(s1: i32, s2: i32) -> i32 {
-    s1 - s2
+    cmp::max(s1 - s2, 0)
 }

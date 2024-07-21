@@ -1,4 +1,4 @@
-use super::{swap_multiples, valid_for_encryption};
+use super::valid_for_encryption;
 
 /// Decrypts a packet.
 ///
@@ -44,27 +44,23 @@ use super::{swap_multiples, valid_for_encryption};
 ///
 /// assert_eq!(buf, [21, 18, 145, 72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 33]);
 /// ```
-pub fn decrypt_packet(buf: &mut [u8], swap_multiple: u8) {
+pub fn decrypt_packet(buf: &mut [u8], key: i32, magic: i32) {
     if !valid_for_encryption(buf) {
         return;
     }
 
-    let length = buf.len();
-    let mut tmp: Vec<u8> = vec![0; length];
-    let big_half = (length + 1) / 2;
-    let little_half = length / 2;
-    for i in 0..big_half {
-        tmp[i] = buf[i * 2];
-        if tmp[i] & 0x7f != 0 {
-            tmp[i] ^= 0x80;
-        }
+    for i in 1..buf.len() {
+        let mut val = buf[i - 1] as i32;
+
+        let modifier = match i % 3 {
+            0 => key / 253,
+            1 => -1 * ((key - 1) % 253),
+            2 => -1 * magic,
+            _ => unreachable!("Unexecpted value: {}", i % 3),
+        };
+
+        val = (val + modifier) & 0xFF;
+
+        buf[i - 1] = val as u8;
     }
-    for i in 0..little_half {
-        tmp[length - 1 - i] = buf[(i * 2) + 1];
-        if tmp[length - 1 - i] & 0x7f != 0 {
-            tmp[length - 1 - i] ^= 0x80;
-        }
-    }
-    swap_multiples(&mut tmp, swap_multiple);
-    buf.copy_from_slice(&tmp);
 }

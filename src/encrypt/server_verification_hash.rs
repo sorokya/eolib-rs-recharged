@@ -17,9 +17,9 @@
 ///
 /// # Warning
 /// Oversized challenges may result in negative hash values, which cannot be represented properly in the EO protocol.
-pub fn server_verification_hash(mut challenge: i32) -> i32 {
-    challenge += 1;
-    110905
-        + ((challenge % 9) + 1) * ((11092004 - challenge) % (((challenge % 11) + 1) * 119)) * 119
-        + (challenge % 2004)
+pub fn server_verification_hash(x: i64) -> i32 {
+    ((x + 1) % 2023
+        + 1
+        + 110 * (31072023 - (x + 1)) % (109 * ((x + 1) % 22 + 1)) * ((x + 1) % 2 + 1)
+        + 11221) as i32
 }
