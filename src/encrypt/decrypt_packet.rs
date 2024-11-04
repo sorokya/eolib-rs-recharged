@@ -49,17 +49,10 @@ pub fn decrypt_packet(buf: &mut [u8], key: i32, magic: i32) {
         return;
     }
 
-    for i in 1..buf.len() {
+    for i in 1..=buf.len() {
         let mut val = buf[i - 1] as i32;
 
-        let modifier = match i % 3 {
-            0 => key / 253,
-            1 => -1 * ((key - 1) % 253),
-            2 => -1 * magic,
-            _ => unreachable!("Unexecpted value: {}", i % 3),
-        };
-
-        val = (val + modifier) & 0xFF;
+        val = (((val + 253) % 256) - key - i as i32) & 0xFF;
 
         buf[i - 1] = val as u8;
     }

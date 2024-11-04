@@ -2,7 +2,9 @@ use bytes::{BufMut, Bytes, BytesMut};
 use encoding_rs::WINDOWS_1252;
 use thiserror::Error;
 
-use super::{encode_number, encode_string, CHAR_MAX, INT_MAX, SHORT_MAX, THREE_MAX};
+use super::{
+    encode_number, encode_number_64, encode_string, CHAR_MAX, INT_MAX, SHORT_MAX, THREE_MAX,
+};
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum EoWriterError {
@@ -109,6 +111,13 @@ impl EoWriter {
     pub fn add_int(&mut self, int: i32) -> Result<(), EoWriterError> {
         let encoded = encode_number(int)?;
         self.data.put_slice(&encoded[0..4]);
+        Ok(())
+    }
+
+    /// adds a five to the data stream
+    pub fn add_five(&mut self, int: i64) -> Result<(), EoWriterError> {
+        let encoded = encode_number_64(int)?;
+        self.data.put_slice(&encoded[0..5]);
         Ok(())
     }
 

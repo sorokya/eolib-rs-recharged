@@ -4,7 +4,7 @@ use bytes::Bytes;
 use encoding_rs::WINDOWS_1252;
 use thiserror::Error;
 
-use super::{decode_number, decode_string};
+use super::{decode_number, decode_number_64, decode_string};
 
 #[derive(Error, Debug)]
 pub enum EoReaderError {
@@ -197,6 +197,13 @@ impl EoReader {
     /// increases the read position by 4
     pub fn get_int(&self) -> Result<i32, EoReaderError> {
         Ok(decode_number(self.read_bytes(4)?))
+    }
+
+    /// returns five [u8]s from the data stream decoded into an [i64]
+    ///
+    /// increases the read position by 5
+    pub fn get_five(&self) -> Result<i64, EoReaderError> {
+        Ok(decode_number_64(self.read_bytes(5)?))
     }
 
     /// returns a [String] from the data stream

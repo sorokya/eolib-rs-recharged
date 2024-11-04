@@ -143,6 +143,37 @@ pub fn encode_number(number: i32) -> Result<[u8; 4], EoWriterError> {
     Ok(bytes)
 }
 
+pub fn encode_number_64(number: i64) -> Result<[u8; 5], EoWriterError> {
+    let mut bytes: [u8; 5] = [254, 254, 254, 254, 254];
+
+    let original_number = number;
+    let mut number = number;
+
+    if original_number >= INT_MAX {
+        bytes[4] = (number / INT_MAX as i64) as u8 + 1;
+        number %= INT_MAX as i64;
+    }
+
+    if original_number >= THREE_MAX as i64 {
+        bytes[3] = (number / THREE_MAX as i64) as u8 + 1;
+        number %= THREE_MAX as i64;
+    }
+
+    if original_number >= SHORT_MAX as i64 {
+        bytes[2] = (number / SHORT_MAX as i64) as u8 + 1;
+        number %= SHORT_MAX as i64;
+    }
+
+    if original_number >= CHAR_MAX as i64 {
+        bytes[1] = (number / CHAR_MAX as i64) as u8 + 1;
+        number %= CHAR_MAX as i64;
+    }
+
+    bytes[0] = number as u8 + 1;
+
+    Ok(bytes)
+}
+
 /// Returns a decoded number from an EO Byte array
 ///
 /// EO uses a maximum of four bytes to represent a number
@@ -192,6 +223,25 @@ pub fn decode_number(bytes: &[u8]) -> i32 {
         .wrapping_add(data[0] as i32)
 }
 
+pub fn decode_number_64(bytes: &[u8]) -> i64 {
+    let mut data: [u8; 5] = [254, 254, 254, 254, 254];
+    for i in 0..5 {
+        if bytes.len() > i && bytes[i] != 0 {
+            data[i] = bytes[i];
+        }
+        if data[i] == 254 {
+            data[i] = 1;
+        }
+        data[i] -= 1;
+    }
+
+    ((data[4] as i64).wrapping_mul(INT_MAX))
+        .wrapping_add((data[3] as i64).wrapping_mul(THREE_MAX as i64))
+        .wrapping_add((data[2] as i64).wrapping_mul(SHORT_MAX as i64))
+        .wrapping_add((data[1] as i64).wrapping_mul(CHAR_MAX as i64))
+        .wrapping_add(data[0] as i64)
+}
+
 /// Decodes a string in place
 ///
 /// This is used for map names and sign text in map files
@@ -208,17 +258,8 @@ pub fn decode_number(bytes: &[u8]) -> i32 {
 /// assert_eq!(name, "Void");
 /// ````
 pub fn decode_string(buf: &mut [u8]) {
-    buf.reverse();
-
-    let parity = (buf.len() + 1) % 2;
-
     for (i, c) in buf.iter_mut().enumerate() {
-        *c = match (i % 2 != parity, *c) {
-            (true, ch @ 34..=125) => 125 - ch + 34,
-            (false, ch @ 34..=79) => 79 - ch + 34,
-            (false, ch @ 80..=125) => 125 - ch + 80,
-            _ => *c,
-        };
+        *c += if i % 2 == 0 { 2 } else { 1 }
     }
 }
 
@@ -237,18 +278,9 @@ pub fn decode_string(buf: &mut [u8]) {
 /// assert_eq!(buf, [0x69, 0x36, 0x5E, 0x49]);
 /// ````
 pub fn encode_string(buf: &mut [u8]) {
-    let parity = (buf.len() + 1) % 2;
-
     for (i, c) in buf.iter_mut().enumerate() {
-        *c = match (i % 2 != parity, *c) {
-            (true, ch @ 34..=125) => 125 - ch + 34,
-            (false, ch @ 34..=79) => 79 - ch + 34,
-            (false, ch @ 80..=125) => 125 - ch + 80,
-            _ => *c,
-        };
+        *c -= if i % 2 == 0 { 2 } else { 1 }
     }
-
-    buf.reverse();
 }
 
 mod eo_reader;

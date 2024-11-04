@@ -1,5 +1,5 @@
 [package]
-name = "eolib-recharged"
+name = "eolib_recharged"
 version = "1.0.0-RC1"
 authors = ["Richard Leek <richard@richardleek.com>"]
 description = "A core rust library for writing applications related to Endless Online Recharged"

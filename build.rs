@@ -598,6 +598,7 @@ fn write_struct(
     let mut derives = vec!["Debug", "Default", "PartialEq", "Eq", "Clone"];
     if name == "Coords" {
         derives.push("Copy");
+        derives.push("Hash");
     }
 
     code.push_str(&format!("#[derive({})]\n", derives.join(", ")));
@@ -1048,7 +1049,7 @@ fn generate_inner_field_serialize(
                     if name == "array_item"
                         && matches!(
                             field.data_type.as_str(),
-                            "byte" | "char" | "short" | "three" | "int"
+                            "byte" | "char" | "short" | "three" | "int" | "five"
                         )
                     {
                         "*"
@@ -1539,6 +1540,7 @@ fn get_field_type(data_type: &str) -> String {
         "short" => "i32".to_owned(),
         "three" => "i32".to_owned(),
         "int" => "i32".to_owned(),
+        "five" => "i64".to_owned(),
         "bool" => "bool".to_owned(),
         "string" => "String".to_owned(),
         "encoded_string" => "String".to_owned(),
@@ -1547,12 +1549,13 @@ fn get_field_type(data_type: &str) -> String {
     }
 }
 
-static PRIMITIVE_TYPES: [&str; 9] = [
+static PRIMITIVE_TYPES: [&str; 10] = [
     "byte",
     "char",
     "short",
     "three",
     "int",
+    "five",
     "bool",
     "string",
     "encoded_string",
@@ -1575,13 +1578,52 @@ fn get_imports(elements: &[StructElement], protocols: &[(Protocol, PathBuf)]) ->
     let os_separator = std::path::MAIN_SEPARATOR;
 
     let path_mappings: std::collections::HashMap<String, &str> = std::collections::HashMap::from([
-        (format!("eo-protocol{}xml{}protocol.xml", os_separator, os_separator), "crate::protocol"),
-        (format!("eo-protocol{}xml{}map{}protocol.xml", os_separator, os_separator, os_separator), "crate::protocol::map"),
-        (format!("eo-protocol{}xml{}pub{}protocol.xml", os_separator, os_separator, os_separator), "crate::protocol::r#pub"),
-        (format!("eo-protocol{}xml{}pub{}server{}protocol.xml", os_separator, os_separator, os_separator, os_separator), "crate::protocol::r#pub::server"),
-        (format!("eo-protocol{}xml{}net{}protocol.xml", os_separator, os_separator, os_separator), "crate::protocol::net"),
-        (format!("eo-protocol{}xml{}net{}client{}protocol.xml", os_separator, os_separator, os_separator, os_separator), "crate::protocol::net::client"),
-        (format!("eo-protocol{}xml{}net{}server{}protocol.xml", os_separator, os_separator, os_separator, os_separator),"crate::protocol::net::server"),
+        (
+            format!("eo-protocol{}xml{}protocol.xml", os_separator, os_separator),
+            "crate::protocol",
+        ),
+        (
+            format!(
+                "eo-protocol{}xml{}map{}protocol.xml",
+                os_separator, os_separator, os_separator
+            ),
+            "crate::protocol::map",
+        ),
+        (
+            format!(
+                "eo-protocol{}xml{}pub{}protocol.xml",
+                os_separator, os_separator, os_separator
+            ),
+            "crate::protocol::r#pub",
+        ),
+        (
+            format!(
+                "eo-protocol{}xml{}pub{}server{}protocol.xml",
+                os_separator, os_separator, os_separator, os_separator
+            ),
+            "crate::protocol::r#pub::server",
+        ),
+        (
+            format!(
+                "eo-protocol{}xml{}net{}protocol.xml",
+                os_separator, os_separator, os_separator
+            ),
+            "crate::protocol::net",
+        ),
+        (
+            format!(
+                "eo-protocol{}xml{}net{}client{}protocol.xml",
+                os_separator, os_separator, os_separator, os_separator
+            ),
+            "crate::protocol::net::client",
+        ),
+        (
+            format!(
+                "eo-protocol{}xml{}net{}server{}protocol.xml",
+                os_separator, os_separator, os_separator, os_separator
+            ),
+            "crate::protocol::net::server",
+        ),
     ]);
 
     for unique_type in &unique_types {
