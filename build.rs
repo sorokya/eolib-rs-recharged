@@ -1033,10 +1033,7 @@ fn generate_inner_field_serialize(
                     None => "",
                 };
 
-                let padded = match field.padded {
-                    Some(padded) => padded,
-                    _ => false,
-                };
+                let padded = field.padded.unwrap_or_default();
 
                 if padded
                     && !length.is_empty()

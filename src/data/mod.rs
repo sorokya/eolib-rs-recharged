@@ -150,8 +150,8 @@ pub fn encode_number_64(number: i64) -> Result<[u8; 5], EoWriterError> {
     let mut number = number;
 
     if original_number >= INT_MAX {
-        bytes[4] = (number / INT_MAX as i64) as u8 + 1;
-        number %= INT_MAX as i64;
+        bytes[4] = (number / INT_MAX) as u8 + 1;
+        number %= INT_MAX;
     }
 
     if original_number >= THREE_MAX as i64 {
