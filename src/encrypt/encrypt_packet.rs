@@ -44,7 +44,7 @@ use super::valid_for_encryption;
 ///
 /// assert_eq!(buf, [149, 161, 146, 228, 17, 242, 200, 236, 229, 239, 236, 247, 236, 160, 239, 172]);
 /// ```
-pub fn encrypt_packet(buf: &mut [u8], key: i32, magic: i32) {
+pub fn encrypt_packet(buf: &mut [u8], key: i32) {
     if !valid_for_encryption(buf) {
         return;
     }

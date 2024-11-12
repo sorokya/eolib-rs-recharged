@@ -646,6 +646,9 @@ fn write_struct_serialize(
     enums: &[Enum],
     structs: &[Struct],
 ) {
+    code.push_str(
+        "        let current_string_sanitization_mode = writer.get_string_sanitization_mode();\n",
+    );
     for element in elements {
         match element {
             StructElement::Break => {
@@ -667,6 +670,7 @@ fn write_struct_serialize(
                 generate_serialize_switch(code, name, switch);
             }
             StructElement::Chunked(chunked) => {
+                code.push_str("        writer.set_string_sanitization_mode(true);\n");
                 for element in &chunked.elements {
                     match element {
                         StructElement::Break => {
@@ -696,6 +700,9 @@ fn write_struct_serialize(
             _ => {}
         }
     }
+    code.push_str(
+        "        writer.set_string_sanitization_mode(current_string_sanitization_mode);\n",
+    );
     code.push_str("        Ok(())\n");
 }
 
@@ -772,7 +779,7 @@ fn write_struct_deserialize(
                             generate_deserialize_length(code, length);
                         }
                         StructElement::Dummy(dummy) => {
-                            code.push_str(&format!("        reader.get_{}()?;\n", dummy.data_type));
+                            code.push_str(&format!("        reader.get_{}();\n", dummy.data_type));
                         }
                         StructElement::Field(field) => {
                             generate_deserialize_field(code, field, enums, structs)
@@ -821,7 +828,7 @@ fn write_struct_deserialize(
                 }
             }
             StructElement::Dummy(dummy) => {
-                code.push_str(&format!("        reader.get_{}()?;\n", dummy.data_type));
+                code.push_str(&format!("        reader.get_{}();\n", dummy.data_type));
             }
             StructElement::Length(length) => {
                 generate_deserialize_length(code, length);
@@ -898,9 +905,14 @@ fn generate_serialize_field(code: &mut String, field: &Field, enums: &[Enum], st
         };
 
         code.push_str(&format!(
-            "        if let Some({}) = self.{} {{\n",
+            "        if let Some({}) = self.{}{} {{\n",
             replace_keyword(name),
-            replace_keyword(name)
+            replace_keyword(name),
+            if is_primitive(&field.data_type) || enums.iter().any(|e| e.name == field.data_type) {
+                ""
+            } else {
+                ".as_ref()"
+            }
         ));
         generate_inner_field_serialize(code, field, enums, structs);
         code.push_str("        }\n");
@@ -1191,7 +1203,7 @@ fn generate_deserialize_length(code: &mut String, length: &Length) {
     let offset = length.offset.unwrap_or(0);
 
     if optional {
-        code.push_str("if reader.remaining()? > 0 {{\n");
+        code.push_str("if reader.remaining() > 0 {{\n");
     }
 
     let offset_operation = match offset.cmp(&0) {
@@ -1201,7 +1213,7 @@ fn generate_deserialize_length(code: &mut String, length: &Length) {
     };
 
     code.push_str(&format!(
-        "        let {} = (reader.get_{}()?{}) as usize;\n",
+        "        let {} = (reader.get_{}(){}) as usize;\n",
         replace_keyword(&length.name),
         length.data_type,
         offset_operation,
@@ -1226,7 +1238,7 @@ fn generate_deserialize_field(
         };
 
         code.push_str(&format!(
-            "        data.{} = if reader.remaining()? > 0 {{\n",
+            "        data.{} = if reader.remaining() > 0 {{\n",
             replace_keyword(name)
         ));
         code.push_str("            Some(");
@@ -1252,7 +1264,7 @@ fn generate_deserialize_array(
 ) {
     let optional = matches!(array.optional, Some(true));
     if optional {
-        code.push_str("        if reader.remaining()? > 0 {{\n");
+        code.push_str("        if reader.remaining() > 0 {{\n");
         generate_inner_array_deserialize(code, array, enums, structs);
         code.push_str("        }\n");
     } else {
@@ -1334,7 +1346,7 @@ fn generate_inner_field_deserialize(
             enum_data_type.to_string()
         };
         code.push_str(&format!(
-            "{}::from(reader.get_{}()?)",
+            "{}::from(reader.get_{}())",
             get_field_type(data_type),
             enum_data_type,
         ));
@@ -1342,18 +1354,18 @@ fn generate_inner_field_deserialize(
         code.push_str("EoSerialize::deserialize(reader)?");
     } else if let Some(length) = &field.length {
         match data_type {
-            "string" => code.push_str(&format!("        reader.get_fixed_string({})?", length)),
+            "string" => code.push_str(&format!("        reader.get_fixed_string({})", length)),
             "encoded_string" => code.push_str(&format!(
-                "        reader.get_fixed_encoded_string({})?",
+                "        reader.get_fixed_encoded_string({})",
                 length
             )),
             _ => panic!("Unexpected length for data type: {}", data_type),
         }
     } else {
         match data_type {
-            "blob" => code.push_str("        reader.get_bytes(reader.remaining()?)?"),
+            "blob" => code.push_str("        reader.get_bytes(reader.remaining())"),
             "bool" => code.push_str(&format!(
-                "reader.get_{}()? == 1",
+                "reader.get_{}() == 1",
                 if enum_data_type.is_empty() {
                     "char"
                 } else {
@@ -1361,7 +1373,7 @@ fn generate_inner_field_deserialize(
                 }
             )),
             _ => {
-                code.push_str(&format!("        reader.get_{}()?", data_type));
+                code.push_str(&format!("        reader.get_{}()", data_type));
             }
         }
     }
@@ -1387,8 +1399,18 @@ fn generate_inner_array_deserialize(
             },
             length
         ));
+    } else if let Some(size) = get_fixed_type_size(&array.data_type, structs, enums) {
+        if size == 1 {
+            code.push_str("        let num_items = reader.remaining();\n");
+        } else {
+            code.push_str(&format!(
+                "        let num_items = reader.remaining() / {};\n",
+                size
+            ));
+        }
+        code.push_str("        for _ in 0..num_items {\n");
     } else {
-        code.push_str("        while reader.remaining()? > 0 {\n");
+        code.push_str("        while reader.remaining() > 0 {\n");
     }
 
     if is_static_length {
@@ -1431,6 +1453,47 @@ fn generate_inner_array_deserialize(
     }
 
     code.push_str("        }\n");
+}
+
+fn get_fixed_type_size(data_type: &str, structs: &[Struct], enums: &[Enum]) -> Option<usize> {
+    if let Some(s) = structs.iter().find(|s| s.name == data_type) {
+        let mut size: usize = 0;
+        for e in s.elements.iter() {
+            match e {
+                StructElement::Comment(_) => {}
+                StructElement::Dummy(d) => {
+                    match get_fixed_type_size(&d.data_type, structs, enums) {
+                        Some(s) => size += s,
+                        None => return None,
+                    }
+                }
+                StructElement::Field(f) => {
+                    match get_fixed_type_size(&f.data_type, structs, enums) {
+                        Some(s) => size += s,
+                        None => return None,
+                    }
+                }
+                _ => return None,
+            }
+        }
+
+        return Some(size);
+    }
+
+    if let Some(e) = enums.iter().find(|e| e.name == data_type) {
+        return get_fixed_type_size(&e.data_type, structs, enums);
+    }
+
+    match data_type {
+        "byte" => Some(1),
+        "char" => Some(1),
+        "short" => Some(2),
+        "three" => Some(3),
+        "int" => Some(4),
+        "five" => Some(5),
+        "bool" => Some(1),
+        _ => None,
+    }
 }
 
 fn write_struct_fields(
@@ -1561,6 +1624,10 @@ static PRIMITIVE_TYPES: [&str; 10] = [
     "encoded_string",
     "blob",
 ];
+
+fn is_primitive(data_type: &str) -> bool {
+    PRIMITIVE_TYPES.contains(&data_type)
+}
 
 fn get_imports(elements: &[StructElement], protocols: &[(Protocol, PathBuf)]) -> Vec<String> {
     let mut imports = vec![
