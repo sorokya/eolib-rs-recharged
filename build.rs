@@ -908,7 +908,10 @@ fn generate_serialize_field(code: &mut String, field: &Field, enums: &[Enum], st
             "        if let Some({}) = self.{}{} {{\n",
             replace_keyword(name),
             replace_keyword(name),
-            if is_primitive(&field.data_type) || enums.iter().any(|e| e.name == field.data_type) {
+            if field.data_type != "string"
+                && (is_primitive(&field.data_type)
+                    || enums.iter().any(|e| e.name == field.data_type))
+            {
                 ""
             } else {
                 ".as_ref()"
@@ -1397,15 +1400,19 @@ fn generate_inner_array_deserialize(
             length
         ));
     } else if let Some(size) = get_fixed_type_size(&array.data_type, structs, enums) {
-        if size == 1 {
-            code.push_str("        let num_items = reader.remaining();\n");
+        if delimited {
+            code.push_str("        while reader.remaining() > 0 {\n");
         } else {
-            code.push_str(&format!(
-                "        let num_items = reader.remaining() / {};\n",
-                size
-            ));
+            if size == 1 {
+                code.push_str("        let num_items = reader.remaining();\n");
+            } else {
+                code.push_str(&format!(
+                    "        let num_items = reader.remaining() / {};\n",
+                    size
+                ));
+            }
+            code.push_str("        for _ in 0..num_items {\n");
         }
-        code.push_str("        for _ in 0..num_items {\n");
     } else {
         code.push_str("        while reader.remaining() > 0 {\n");
     }
